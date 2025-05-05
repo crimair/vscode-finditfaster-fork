@@ -14,6 +14,8 @@ import * as os from 'os';
 import { tmpdir } from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { autocompletedInputBox } from './autocompletedInputBox';
+import { pathCompletionFunc } from './autocompletedInputBox';
 
 // Let's keep it DRY and load the package here so we can reuse some data from it
 let PACKAGE: any;
@@ -36,7 +38,7 @@ const commands: { [key: string]: Command } = {
     findFiles: {
         script: 'find_files',  // we append a platform-specific extension later
         uri: undefined,
-        preRunCallback: undefined,
+        preRunCallback: selectSearchPath,
         postRunCallback: undefined,
     },
     findFilesWithType: {
@@ -48,7 +50,7 @@ const commands: { [key: string]: Command } = {
     findWithinFiles: {
         script: 'find_within_files',
         uri: undefined,
-        preRunCallback: undefined,
+        preRunCallback: selectSearchPath,
         postRunCallback: undefined,
     },
     findWithinFilesWithType: {
@@ -158,6 +160,30 @@ async function selectTypeFilter() {
             }
         });
     });
+}
+
+async function selectSearchPath() {
+    const workspaceFolders = vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath) || [];
+    const defaultPath = workspaceFolders.length > 0 ? workspaceFolders[0] : '';
+
+    const selectedPath = await autocompletedInputBox({
+        // Pass the completion function with the desired type ('all' for now)
+        completion: (input) => pathCompletionFunc(input, 'directory'),
+        withSelf: (self) => {
+            self.title = "Select target Directory";
+            self.value = defaultPath;
+            // Trigger initial completion
+            self.items = Array.from(pathCompletionFunc(self.value, 'directory'));
+        },
+    });
+
+    if (selectedPath) {
+        CFG.searchPaths = [selectedPath];
+        console.log('Updated search paths:', CFG.searchPaths);
+        return true;
+    }
+
+    return false;
 }
 
 /** Global variable cesspool erm, I mean, Configuration Data Structure! It does the job for now. */
@@ -420,6 +446,7 @@ function collectSearchLocations() {
         dirs.forEach(x => setOrUpdateOrigin(x, PathOrigin.workspace));
     }
 
+    console.log('Collected search paths:', CFG.searchPaths);
     return locations;
 }
 
@@ -757,6 +784,7 @@ function getCommandString(cmd: Command, withArgs: boolean = true, withTextSelect
         let paths = getWorkspaceFoldersAsString();
         ret += ` ${paths}`;
     }
+    console.log('Collected search paths:', CFG.searchPaths);
     return ret;
 }
 
