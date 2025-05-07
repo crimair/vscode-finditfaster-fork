@@ -163,8 +163,16 @@ async function selectTypeFilter() {
 }
 
 async function selectSearchPath() {
-    const workspaceFolders = vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath) || [];
-    const defaultPath = workspaceFolders.length > 0 ? workspaceFolders[0] : '';
+    let defaultPath = '';
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+        defaultPath = path.dirname(activeEditor.document.uri.fsPath);
+    } else {
+        const workspaceFolders = vscode.workspace.workspaceFolders?.map(folder => folder.uri.fsPath) || [];
+        if (workspaceFolders.length > 0) {
+            defaultPath = workspaceFolders[0];
+        }
+    }
 
     const selectedPath = await autocompletedInputBox({
         // Pass the completion function with the desired type ('all' for now)
